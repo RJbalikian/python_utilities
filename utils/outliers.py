@@ -9,11 +9,11 @@ def std_outliers(df, std_thresh=3, avg_kind='median', axis=1, **kwargs):
     ----------
     df : pandas.DataFrame
         Input pandas dataframe to clean up
-    std_thresh : float, optional
+    std_thresh : float, default=3.0
         Number multiplied by standard deviation to get threshold of what is considered an outlier, by default 3
-    avg_kind : str {'median', 'mean', 'mode', 'geometric'}, optional
+    avg_kind : str {'median', 'mean', 'mode', 'geometric'}, default='median'
         What type of average/mean value to use (not for calculating std deviation, but for removing), by default 'median'
-    axis : int, optional
+    axis : int, default=1
         Which axis to do all actions across. If 1, this will calculate standard devation across columns. If 0, will do so within columns, by default 1
 
     Returns
