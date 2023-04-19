@@ -3,6 +3,24 @@ import numpy as np
 
 #Check each column in df for whether it varies significantly from other columns (axis=0 will do this for rows)
 def std_outliers(df, std_thresh=3, avg_kind='median', axis=1, **kwargs):
+    """Function to remove outliers from dataframe (containing shoreline coordinates, in this case)
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input pandas dataframe to clean up
+    std_thresh : float, optional
+        Number multiplied by standard deviation to get threshold of what is considered an outlier, by default 3
+    avg_kind : str {'median', 'mean', 'mode', 'geometric'}, optional
+        What type of average/mean value to use (not for calculating std deviation, but for removing), by default 'median'
+    axis : int, optional
+        Which axis to do all actions across. If 1, this will calculate standard devation across columns. If 0, will do so within columns, by default 1
+
+    Returns
+    -------
+    df_clean : pandas.DataFrame
+        Dataframe the same size as input df, but with outlier data replaced by np.nan
+    """
     std_df = df.std(axis=axis)
 
     if avg_kind.lower() == 'median':
