@@ -1,7 +1,7 @@
 import pandas as pd
 import pathlib
 
-def fill_gaps(datapath, group_cols=['API_NUMBER', 'TABLE_NAME'], sort_col='TOP' , target_col='Stratcode', target='dg', match_type='contains', export=None):
+def fill_gaps(datapath, group_cols=['API_NUMBER', 'TABLE_NAME'], sort_col='TOP' , target_col='Stratcode', target='dg', match_type='contains', export=None, verbose=False, print_results=False, return_both=False, **read_csv_kwargs):
     """Function to fill gaps in table, specifically for use where top and bottom of an interval are known and the entire interval between is assumed to be similar. 
 
     Parameters
@@ -26,19 +26,27 @@ def fill_gaps(datapath, group_cols=['API_NUMBER', 'TABLE_NAME'], sort_col='TOP' 
     pandas.DataFrame
         Pandas dataframe with gaps in target interval filled
     """
-    logsWithDG = pd.read_csv(datapath,  sep='\t')
+    logsWithDG = pd.read_csv(datapath,  **read_csv_kwargs)
 
     out_logsWithDG = logsWithDG.copy()
 
-    wellLogsGrouped = logsWithDG.groupby(group_cols)
-    for sortCols, wellDF in wellLogsGrouped:
-        wellDF.sort_values(by=sort_col, inplace=True, ascending=True)
+    containsList = ['contains', 'in']
+    fullMatchList = ['fullmatch', 'exact', 'full', 'match']
 
-        if match_type == 'contains':
-            wellDF['isTarget'] = wellDF[target_col].str.contains(target, case=False)
-        elif match_type == 'fullmatch' or match_type =='match':
+
+    wellLogsGrouped = logsWithDG.groupby(group_cols)
+    if verbose:
+        print("Number of wells:", wellLogsGrouped.ngroups)
+    for sortCols, wellDF in wellLogsGrouped:
+        #wellDF.sort_values(by=sort_col, inplace=True, ascending=True)
+
+        if match_type.lower() in containsList:
+            wellDF['isTarget'] = wellDF[target_col].str.contains(target, case=False, regex=False)
+            wellDF['isTarget'].fillna(False, inplace=True)
+        elif match_type.lower() in fullMatchList:
             wellDF['isTarget'] = wellDF[target_col].str.fullmatch(target, case=False)
-        
+            wellDF['isTarget'].fillna(False, inplace=True)
+               
         firstTarget = False
         lastTarget = False
 
@@ -46,18 +54,39 @@ def fill_gaps(datapath, group_cols=['API_NUMBER', 'TABLE_NAME'], sort_col='TOP' 
             if firstTarget==False:
                 if contains_target:
                     firstTarget = currIndex
+                    lastTarget = firstTarget
                     continue
             else:
                 if contains_target:
                     lastTarget = currIndex
                     continue
-        
-        out_logsWithDG.loc[firstTarget:lastTarget, target_col] = target      
+            if contains_target and verbose:
+                print('Fill identified in row:'+ currIndex)
+            
+            
+        if firstTarget != False and firstTarget != lastTarget:
+            for repInd in range(firstTarget, lastTarget):
+                if target in str(out_logsWithDG.loc[repInd, target_col]) and target != str(out_logsWithDG.loc[repInd, target_col]):
+                    pass
+                else:
+                    out_logsWithDG.loc[repInd, target_col] = target      
+            if verbose:
+                print(f'{sortCols}: Filling in from {firstTarget} to {lastTarget}')    
+        else:
+            if verbose:
+                print(f"{sortCols}: No target value found")
     
+    if print_results:
+        #print(logsWithDG[target_col]==out_logsWithDG[target_col])
+        pass
+       
     if export is not None:
         if export == True:
             export = pathlib.Path(datapath).with_stem(pathlib.Path(datapath).stem+'_filled')
             out_logsWithDG.to_csv(export, index_label='ID')
         else:
            out_logsWithDG.to_csv(export, index_label='ID')
+
+    if return_both:
+        return logsWithDG, out_logsWithDG
     return out_logsWithDG
