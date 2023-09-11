@@ -1,4 +1,6 @@
+import csv
 import pathlib
+import re
 import xml
 
 import matplotlib
@@ -7,6 +9,117 @@ import numpy as np
 import pandas as pd
 import scipy
 
+def vtk_reader(vtk_filepath, return_df=True):
+    #Read file
+    with open(vtk_filepath, 'r') as datafile:
+        filereader = csv.reader(datafile)
+
+        #Flags indicating row on which each section of file begins
+        startLocs = 0
+        startData = 0
+        #Text indicator for start of file section
+        startLocInd = 'POINTS'
+        startDataInd = 'LOOKUP_TABLE'
+
+        #Flags indicating row on which each section of file end
+        endLocs = 0
+        endData = 0
+        #Indicator for end of file section
+        endLocInd = []
+        endDataInd = []
+
+        #Lists that will hold text between each section of file (that more or less doesn't change)
+        fileLead = []
+        fileMid = []
+        fileTail = []
+
+        #Lists that will hold data
+        vtkdata = []
+        vtklocs = []
+
+        #Initialize lists
+        newrow = [] #THis may not need initializing
+        xLocPts = []
+        yLocPts = []
+        zLocPts = []
+        vPts = []
+
+        #Go through each row and find the important stuff
+        for row in enumerate(filereader):
+            if startLocs == 0:
+                fileLead.append(row[1])
+                fileLead[row[0]] = fileLead[row[0]][:]
+                if startLocInd in str(row[1]):
+                    startLocs = 1
+            elif startLocs == 1 and endLocs == 0:
+                if endLocInd == row[1]:
+                    endLocs = 1
+                else:
+                    newrow = re.split(' +', str(row[1][0]))
+                    newrow = newrow[1:]
+                    vtklocs.append(newrow)
+            elif startData == 0:
+                fileMid.append(row[1])
+                if startDataInd in str(row[1]):
+                    startData = 1
+            elif startData == 1 and endData == 0:
+                if row[1] == endDataInd:
+                    endData == 1
+                else:
+                    newrow = re.split(' +', str(row[1][0]))
+                    newrow = newrow[1:]
+                    vtkdata.append(newrow)
+            else:
+                fileTail.append(row[1])
+                fileTail[row[0]] = fileTail[row[0]][:]
+
+    #xPtCols = np.arange(0, 1000, 3)
+    #yPtCols = np.arange(1, 1000, 3)
+    #zPtCols = np.arange(2, 1000, 3)
+    
+    xPtCols = [0,3,6,9] #The ones I am using are formatted like this, 
+    yPtCols = [1,4,7,10]
+    zPtCols = [2,5,8,11]
+
+    for r in vtklocs:#For each row with locations
+        Xs = 0.0
+        for x in xPtCols:
+            Xs = Xs + float(r[x])
+        xLocPts.append(Xs/4.0)
+
+        Ys = 0.0
+        for y in yPtCols:
+            Ys = Ys + float(r[y])
+        yLocPts.append(Ys/4.0)
+
+        Zs = 0.0
+        for z in zPtCols:
+            Zs = Zs + float(r[z])
+        zLocPts.append(Zs/4)
+
+
+    for d in vtkdata:
+        for i in d:
+            vPts.append(i)
+
+    dataframeIN = pd.DataFrame([xLocPts, yLocPts, zLocPts, vPts]).transpose()
+    dataframeIN.columns = ['X','Y','Z','Resistivity']
+    dataframeIN['minElecSpacing'] = np.nanmin(dataframeIN['X'].diff())
+
+    #Format vtk file
+    fileHeaderDict = {}
+    fileHeaderDict['Filename'] = pathlib.Path(vtk_filepath).as_posix()
+    fileHeaderDict['Project'] = 'NA'
+    fileHeaderDict['Array'] = 'NA'
+    fileHeaderDict['minElectSpcng'] = str(round(dataframeIN.loc[1,'X'] - dataframeIN.loc[0,'X'],1))
+    fileHeaderDict['DataPts'] = len(dataframeIN)
+    
+    if return_df:
+        return dataframeIN
+
+def soundings_to_vtk(input_data, xcol='X', ycol='Y', zcol='Z', datacol='Data'):
+
+    
 
 def xyz_to_dae(xyz_data, xcol='X', ycol='Y', zcol='Z', datacol='Data', dimensions=['x', 'z'], cmap='nipy_spectral', qhull_options='Qbb Qc Qz', export=None, plot_vor=False, clean_type='move'):
     if isinstance(xyz_data, pd.DataFrame):
